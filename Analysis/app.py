@@ -11,7 +11,7 @@ from flask import Flask, jsonify
 from sqlalchemy.sql.operators import json_path_getitem_op
 
 #generate engine to sqlite
-engine = create_engine("sqlite:///hawaii.sqlite")
+engine = create_engine("sqlite:///../Resources/hawaii.sqlite")
 
 #reflect a new model from the database schema
 Base = automap_base()
