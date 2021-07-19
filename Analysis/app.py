@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, func
 
 from flask import Flask, jsonify
+from sqlalchemy.sql.operators import json_path_getitem_op
 
 #generate engine to sqlite
 engine = create_engine("sqlite:///hawaii.sqlite")
@@ -41,7 +42,8 @@ def welcome():
         For Temperature statistics across the state of Hawaii over a time period:<br/>
         /api/v1.0/start_date/end_date<br/>
         Please enter dates in the format "YYYY-MM-DD"<br/>
-        If no end date is specified, end of range will be 2017-08-23
+        If no end date is specified, end of range will be 2017-08-23<br/>
+        Dataset begins 2010-01-01
     """)
 
 
@@ -55,8 +57,8 @@ def precipitation():
     query_date = recent_date.date() - dt.timedelta(days=365)
 
     precipitation_scores = session.query(Measurement.date, Measurement.prcp).\
-    filter(Measurement.date <= recent_date).\
-    filter(Measurement.date >= query_date).all()
+        filter(Measurement.date <= recent_date).\
+        filter(Measurement.date >= query_date).all()
 
     session.close()
 
@@ -90,9 +92,9 @@ def tobs():
     query_date = recent_date.date() - dt.timedelta(days=365)
 
     temperature = session.query(Measurement.station, Measurement.date, Measurement.tobs).\
-    filter(Measurement.station == 'USC00519281').\
-    filter(Measurement.date <= recent_date).\
-    filter(Measurement.date >= query_date).all()
+        filter(Measurement.station == 'USC00519281').\
+        filter(Measurement.date <= recent_date).\
+        filter(Measurement.date >= query_date).all()
 
     session.close()
 
@@ -105,20 +107,27 @@ def tobs():
     
     return jsonify(all_temperature_records)
 
-
+@app.route("/api/v1.0/<start>/", defaults={'end':'2017-08-23'})
 @app.route("/api/v1.0/<start>/<end>")
-def range():
+def range(start, end):
     session = Session(engine)
 
+    query_date = start
+    recent_date = end
+
+    temperature_ranged_stats = session.query(Measurement.date, func.min(Measurement.tobs), func.max(Measurement.tobs), func.avg(Measurement.tobs)).\
+        filter(Measurement.date <= recent_date).\
+        filter(Measurement.date >= query_date).all()
     
-
-    precipitation_scores = session.query(Measurement.date, Measurement.prcp).\
-    filter(Measurement.date <= recent_date).\
-    filter(Measurement.date >= query_date).all()
-
-
-
-
+    temperature_stats = []
+    for date, tmin, tmax, tavg in temperature_ranged_stats:
+        summary_stats = {}
+        summary_stats['Temperature Minimum:'] = tmin
+        summary_stats['Temperature Maximum:'] = tmax
+        summary_stats['Temperature Average:'] = tavg
+        temperature_stats.append(summary_stats)
+    
+    return jsonify(temperature_stats)
 
 if __name__ == "__main__":
     app.run(debug=True)
