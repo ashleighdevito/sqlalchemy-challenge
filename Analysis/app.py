@@ -26,27 +26,40 @@ app = Flask(__name__)
 #define home route
 @app.route("/")
 def welcome():
-    """List all available api routes."""
-    return (
-        f"Available Routes:<br/>"
-        f"/api/v1.0/precipitation<br/>"
-        f"/api/v1.0/stations<br/>"
-        f"/api/v1.0/tobs"
-    )
+
+    return ("""
+        Available Routes:<br/>
+        For measured precipitation values by date over the final year of data:<br/>
+        /api/v1.0/precipitation<br/>
+        <br/>
+        For a list of weather stations across the state of Hawaii:<br/>
+        /api/v1.0/stations<br/>
+        <br/>
+        For a list of temperature observations from the Waihee Station by date over the final year of data:<br/>
+        /api/v1.0/tobs<br/>
+        <br/>
+        For Temperature statistics across the state of Hawaii over a time period:<br/>
+        /api/v1.0/start_date/end_date<br/>
+        Please enter dates in the format "YYYY-MM-DD"<br/>
+        If no end date is specified, end of range will be 2017-08-23
+    """)
 
 
 # 4. Define what to do when a user hits the /about route
 @app.route("/api/v1.0/precipitation")
 def precipitation():
     session = Session(engine)
+
     last_date = str(session.query(Measurement.date).order_by(Measurement.date.desc()).first())
     recent_date = dt.datetime.strptime(last_date, "('%Y-%m-%d',)")
     query_date = recent_date.date() - dt.timedelta(days=365)
+
     precipitation_scores = session.query(Measurement.date, Measurement.prcp).\
     filter(Measurement.date <= recent_date).\
     filter(Measurement.date >= query_date).all()
 
-    
+    session.close()
+
     precipitation_data = {}
     for date, prcp in precipitation_scores:
         if date in precipitation_data:
@@ -54,23 +67,58 @@ def precipitation():
         else:
             precipitation_data[date]= [prcp]
 
-    session.close()
-
     return jsonify(precipitation_data)
 
 
 @app.route("/api/v1.0/stations")
 def stations():
     session = Session(engine)
-    stations = session.query(Station.station).all()
+
+    stations = session.query(Station.name).all()
+
     session.close()
+
     all_stations = list(np.ravel(stations))
     return jsonify(all_stations)
 
 @app.route("/api/v1.0/tobs")
 def tobs():
-    print("Server received request for 'About' page...")
-    return "Welcome to my 'About' page!"
+    session = Session(engine)
+
+    last_date = str(session.query(Measurement.date).order_by(Measurement.date.desc()).first())
+    recent_date = dt.datetime.strptime(last_date, "('%Y-%m-%d',)")
+    query_date = recent_date.date() - dt.timedelta(days=365)
+
+    temperature = session.query(Measurement.station, Measurement.date, Measurement.tobs).\
+    filter(Measurement.station == 'USC00519281').\
+    filter(Measurement.date <= recent_date).\
+    filter(Measurement.date >= query_date).all()
+
+    session.close()
+
+    all_temperature_records = []
+    for station, date, tobs in temperature:
+        temperature_dict = {'Date':'Temperature Observation'}
+        temperature_dict['Date']=date
+        temperature_dict['Temperature Observation']=tobs
+        all_temperature_records.append(temperature_dict)
+    
+    return jsonify(all_temperature_records)
+
+
+@app.route("/api/v1.0/<start>/<end>")
+def range():
+    session = Session(engine)
+
+    
+
+    precipitation_scores = session.query(Measurement.date, Measurement.prcp).\
+    filter(Measurement.date <= recent_date).\
+    filter(Measurement.date >= query_date).all()
+
+
+
+
 
 if __name__ == "__main__":
     app.run(debug=True)
